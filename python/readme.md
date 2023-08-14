@@ -31,7 +31,7 @@ options:
   -d DEVICE, --device DEVICE
                         device name
   -o OPERATION, --operation OPERATION
-                        operation: can be list, create, delete, get
+                        operation: can be list, create, delete, get, device-list
   -e EVENT_TOPIC, --event_topic EVENT_TOPIC
                         event topic
   -s STATE_TOPIC, --state_topic STATE_TOPIC
