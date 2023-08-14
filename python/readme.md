@@ -43,13 +43,13 @@ options:
 ### List registries
 
 ```
-./cb-iot.py -c auth/terraform-credentials-testing.json -p PROJECT-NAME -r us-central1 -o list
+./cb-iot.py -c auth/credentials.json -p PROJECT-NAME -r us-central1 -o list
 ```
 
 ### Get registry and show its configuration
 
 ```
-./cb-iot.py -c auth/terraform-credentials-testing.json -p PROJECT-NAME -r us-central1 -g REGISTRY-NAME -o get
+./cb-iot.py -c auth/credentials.json -p PROJECT-NAME -r us-central1 -g REGISTRY-NAME -o get
 ```
 
 
