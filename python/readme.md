@@ -14,8 +14,8 @@
  \___|_.__/      |_|\___/ \__|
                               
 
-usage: cb-iot.py [-h] [-v] [-c CREDENTIALS] [-p PROJECT] [-r REGION] [-g REGISTRY] [-d DEVICE] [-o OPERATION] [-e EVENT_TOPIC]
-                 [-s STATE_TOPIC]
+usage: cb-iot.py [-h] [-v] [-c CREDENTIALS] [-p PROJECT] [-r REGION] [-g REGISTRY] [-d DEVICE] [-n DEVICE_NUM_ID] [-o OPERATION] [-e EVENT_TOPIC] [-s STATE_TOPIC] [-k PUBLIC_KEY]
+                 [-f PUBLIC_KEY_FORMAT]
 
 options:
   -h, --help            show this help message and exit
@@ -30,12 +30,18 @@ options:
                         registry name
   -d DEVICE, --device DEVICE
                         device name
+  -n DEVICE_NUM_ID, --device-num-id DEVICE_NUM_ID
+                        device num ID
   -o OPERATION, --operation OPERATION
                         operation: can be list, create, delete, get, device-list
-  -e EVENT_TOPIC, --event_topic EVENT_TOPIC
+  -e EVENT_TOPIC, --event-topic EVENT_TOPIC
                         event topic
-  -s STATE_TOPIC, --state_topic STATE_TOPIC
+  -s STATE_TOPIC, --state-topic STATE_TOPIC
                         state topic
+  -k PUBLIC_KEY, --public-key PUBLIC_KEY
+                        public key
+  -f PUBLIC_KEY_FORMAT, --public-key-format PUBLIC_KEY_FORMAT
+                        public key format (can be RSA_PEM, RSA_X509_PEM, ES256_PEM, ES256_X509_PEM)
 ```
 
 ## Examples
