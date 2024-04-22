@@ -18,6 +18,7 @@ __email__ = "francesco.anselmo@gmail.com"
 __status__ = "Dev"
 
 import os
+import io
 import argparse
 from clearblade.cloud import iot_v1
 from pyfiglet import *
@@ -31,8 +32,12 @@ def registry_list(project, region):
 
     page_result = client.list_device_registries(request=request)
 
+    output = []
     for response in page_result:
-        print(response.id, response.name)
+        output.append(response.id)
+        # print(response.id, response.name)
+    print(output)
+    print(output.sort())
 
 def registry_create(project, region, registry_id, event_topic, state_topic):
     client = iot_v1.DeviceManagerClient()
@@ -128,7 +133,8 @@ def device_list(project, region, registry):
     print("Showing devices for registry %s:" % registry)
     try:
         for device in response:
-            print(device.id, device.num_id, device.gateway_config['gatewayType'])
+            #print(device.id, device.num_id, device.gateway_config['gatewayType'])
+            print(device.id, device.num_id)
     except Exception as e:
         print(e)
         raise    
@@ -152,6 +158,8 @@ def device_get(project, region, registry, id):
         print(e)
         raise
 
+    return(response)
+
 
 def device_create(project, region, registry, id):
     client = iot_v1.DeviceManagerClient()
@@ -171,6 +179,114 @@ def device_create(project, region, registry, id):
     print(response)
     try:
         print("Created device %s:" % id, response.id, response.num_id, response.name)
+    except Exception as e:
+        print(e)
+        raise
+    
+def device_create_numid(project, region, registry, id, numid):
+    client = iot_v1.DeviceManagerClient()
+    parent = client.registry_path(
+        project,
+        region,
+        registry)
+
+    device = iot_v1.Device(
+        id=id, 
+        num_id=numid,
+        gateway_config={"gatewayType": iot_v1.GatewayType.NON_GATEWAY},
+        log_level=iot_v1.LogLevel.ERROR)
+    
+    request = iot_v1.CreateDeviceRequest(parent=parent, device=device)
+
+    response = client.create_device(request)
+    print(response)
+    try:
+        # print("Created device %s:" % id, response.id, response.num_id, response.name)
+        print("Created device %s:" % id)
+    except Exception as e:
+        print(e)
+        raise
+
+def device_unbind_from_gateway(project, region, registry, id, gateway):
+    client = iot_v1.DeviceManagerClient()
+
+    parent = client.registry_path(
+        project,
+        region,
+        registry)
+
+    request = iot_v1.UnbindDeviceFromGatewayRequest(
+        parent=parent,
+        deviceId=id,
+        gatewayId=gateway
+    )
+    response = client.unbind_device_from_gateway(request)
+    print(response)
+
+def device_update_numid(project, region, registry, id, numid):
+    client = iot_v1.DeviceManagerClient()
+    parent = client.registry_path(
+        project,
+        region,
+        registry
+    )
+
+    device = iot_v1.Device(
+        id=id, 
+        num_id=numid
+    )
+    
+    request = iot_v1.UpdateDeviceRequest(parent=parent, device=device, updateMask="numId")
+
+    response = client.update_device(request)
+    print(response)
+    try:
+        # print("Updated device %s:" % id, response.id, response.num_id, response.name)
+        print("Updated device %s" % id)
+    except Exception as e:
+        print(e)
+        raise
+
+def device_update_key(project, region, registry, id, key, key_type):
+    client = iot_v1.DeviceManagerClient()
+    parent = client.registry_path(
+        project,
+        region,
+        registry
+    )
+
+    key_format = iot_v1.PublicKeyFormat.RSA_PEM
+    match key_type:
+        case "RSA_PEM":
+            key_format = iot_v1.PublicKeyFormat.RSA_PEM
+        case "RSA_X509_PEM":
+            key_format = iot_v1.PublicKeyFormat.RSA_X509_PEM
+        case "ES256_PEM":
+            key_format = iot_v1.PublicKeyFormat.ES256_PEM
+        case "ES256_X509_PEM":
+            key_format = iot_v1.PublicKeyFormat.ES256_X509_PEM
+
+    with io.open(key) as f:
+        public_key = f.read()
+
+    device = iot_v1.Device(
+        id=id, 
+        credentials=[
+            {
+                "publicKey": {
+                    "format": key_format,
+                    "key": public_key,
+                }
+            }]
+    )
+    
+    request = iot_v1.UpdateDeviceRequest(parent=parent, device=device, updateMask="credentials")
+
+    response = client.update_device(request)
+    print(response)
+    try:
+        # print("Updated device %s:" % id, response.id, response.num_id, response.name)
+        print("Updated device public key %s" % id)
     except Exception as e:
         print(e)
         raise
@@ -210,9 +326,13 @@ def main():
     parser.add_argument("-r","--region", default="us-central1", help="GCP PubSub region")
     parser.add_argument("-g", "--registry",  default="", help="registry name")
     parser.add_argument("-d", "--device", default="", help="device name")
+    parser.add_argument("-n", "--device-num-id", default="", help="device num ID")
     parser.add_argument("-o", "--operation", default="", help="operation: can be list, create, delete, get, device-list")
-    parser.add_argument("-e", "--event_topic", default="", help="event topic")
-    parser.add_argument("-s", "--state_topic", default="", help="state topic")
+    parser.add_argument("-e", "--event-topic", default="", help="event topic")
+    parser.add_argument("-s", "--state-topic", default="", help="state topic")
+    parser.add_argument("-k", "--public-key", default="", help="public key")
+    parser.add_argument("-f", "--public-key-format", default="", help="public key format (can be RSA_PEM, RSA_X509_PEM, ES256_PEM, ES256_X509_PEM)")
+
     
     args = parser.parse_args()
     
@@ -220,6 +340,9 @@ def main():
     REGION_ID = args.region
     TARGET_REGISTRY_ID = args.registry
     TARGET_DEVICE_ID = args.device
+    TARGET_DEVICE_NUMID = args.device_num_id
+    TARGET_DEVICE_KEY = args.public_key
+    TARGET_DEVICE_KEY_FORMAT = args.public_key_format
     OPERATION = args.operation
     os.environ["CLEARBLADE_CONFIGURATION"] = args.credentials
     
@@ -248,12 +371,23 @@ def main():
                 registry_delete(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID)
             case "get":
                 registry_get(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID)
+                
     elif args.credentials!="" and args.project!="" and args.region!="" and args.device!="" and args.operation!="":
         # Device operations
         
         match OPERATION:
             case "create":
-                device_create(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID)
+                if TARGET_DEVICE_NUMID != "":
+                    device_create_numid(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID, TARGET_DEVICE_NUMID)
+                else:
+                    device_create(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID)
+            case "update":
+                if TARGET_DEVICE_NUMID != "":
+                    # device_update_numid(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID, TARGET_DEVICE_NUMID)
+                    device_delete(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID)
+                    device_create_numid(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID, TARGET_DEVICE_NUMID)
+                if TARGET_DEVICE_KEY != "" and TARGET_DEVICE_KEY_FORMAT != "":
+                    device_update_key(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID, TARGET_DEVICE_KEY, TARGET_DEVICE_KEY_FORMAT)
             case "delete":
                 device_delete(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID)
             case "get":
