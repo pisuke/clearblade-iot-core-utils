@@ -20,6 +20,9 @@ __status__ = "Dev"
 import os
 import io
 import argparse
+import json
+import base64
+from tabulate import tabulate
 from clearblade.cloud import iot_v1
 from pyfiglet import *
 
@@ -36,8 +39,11 @@ def registry_list(project, region):
     for response in page_result:
         output.append(response.id)
         # print(response.id, response.name)
-    print(output)
-    print(output.sort())
+    # print(output)
+    # print(output.sort())
+    output.sort()
+    for registry in output:
+        print(registry)
 
 def registry_create(project, region, registry_id, event_topic, state_topic):
     client = iot_v1.DeviceManagerClient()
@@ -131,13 +137,20 @@ def device_list(project, region, registry):
 
     response = client.list_devices(request=request)
     print("Showing devices for registry %s:" % registry)
+    devices = []
     try:
         for device in response:
             #print(device.id, device.num_id, device.gateway_config['gatewayType'])
-            print(device.id, device.num_id)
+            # print(dir(device))
+            # print(device.config)
+            # print(dir(device.config))
+            # 'last_config_ack_time', 'last_config_send_time', 'last_error_status', 'last_error_time', 'last_event_time', 'last_heartbeat_time', 'last_state_time'
+            # print(device.id, device.num_id, device.last_heartbeat_time, device.last_event_time, device.last_state_time)
+            devices.append([device.id, device.num_id, device.last_heartbeat_time, device.last_event_time, device.last_state_time])
     except Exception as e:
         print(e)
-        raise    
+        raise   
+    print(tabulate(devices, headers=["device_id", "device_num_id", "last_heartbeat_time", "last_event_time", "last_state_time"], tablefmt='psql')) 
 
 def device_get(project, region, registry, id):
     client = iot_v1.DeviceManagerClient()
@@ -151,7 +164,7 @@ def device_get(project, region, registry, id):
 
     response = client.get_device(request)
 
-    print(response)
+    # print(response)
     try:
         print("Get device %s:" % id, response.id, response.num_id, response.name)
     except Exception as e:
@@ -309,6 +322,19 @@ def device_delete(project, region, registry, id):
         raise
 
 
+def get_device_config_versions(project, region, registry, id):
+    client = iot_v1.DeviceManagerClient()
+
+    device_path = client.device_path(
+        project,
+        region,
+        registry,
+        id)
+
+    request = iot_v1.ListDeviceConfigVersionsRequest(name=device_path, numVersions=1)
+    response = client.list_device_config_versions(request)
+    return(response.device_configs)
+
 def show_title():
     """Show the program title
     """
@@ -392,6 +418,11 @@ def main():
                 device_delete(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID)
             case "get":
                 device_get(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID)
+                print("Last config message:")
+                for item in get_device_config_versions(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID):
+                    config_binary = item.binaryData
+                    config_message = json.loads(str(base64.b64decode(config_binary).decode("ascii")))
+                    print(item.version, config_message)
             
     else:
         print("Required options missing, please run the program with the -h option for further information.")
