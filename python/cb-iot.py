@@ -133,24 +133,26 @@ def device_list(project, region, registry):
         region,
         registry)
 
+    # request = iot_v1.ListDevicesRequest(parent=registry_path, fieldMask = "id,num_id,gatewayId")
     request = iot_v1.ListDevicesRequest(parent=registry_path)
 
     response = client.list_devices(request=request)
+    # print(response)
     print("Showing devices for registry %s:" % registry)
     devices = []
     try:
         for device in response:
-            #print(device.id, device.num_id, device.gateway_config['gatewayType'])
+            print(device.id, device.num_id, device.gateway_config['gatewayType'], device.last_heartbeat_time, device.last_event_time, device.last_state_time)
             # print(dir(device))
             # print(device.config)
             # print(dir(device.config))
             # 'last_config_ack_time', 'last_config_send_time', 'last_error_status', 'last_error_time', 'last_event_time', 'last_heartbeat_time', 'last_state_time'
             # print(device.id, device.num_id, device.last_heartbeat_time, device.last_event_time, device.last_state_time)
-            devices.append([device.id, device.num_id, device.last_heartbeat_time, device.last_event_time, device.last_state_time])
+            devices.append([device.id, device.num_id, device.gateway_config['gatewayType'], device.last_heartbeat_time, device.last_event_time, device.last_state_time])
     except Exception as e:
         print(e)
         raise   
-    print(tabulate(devices, headers=["device_id", "device_num_id", "last_heartbeat_time", "last_event_time", "last_state_time"], tablefmt='psql')) 
+    print(tabulate(devices, headers=["device_id", "device_num_id", "device_type", "last_heartbeat_time", "last_event_time", "last_state_time"], tablefmt='psql')) 
 
 def device_get(project, region, registry, id):
     client = iot_v1.DeviceManagerClient()
@@ -160,13 +162,14 @@ def device_get(project, region, registry, id):
         registry,
         id)
 
-    request = iot_v1.GetDeviceRequest(name=device_path)
+    request = iot_v1.GetDeviceRequest(name=device_path) # fieldMask="gatewayId" field_mask="gatewayId"
 
     response = client.get_device(request)
 
     # print(response)
     try:
-        print("Get device %s:" % id, response.id, response.num_id, response.name)
+        # print(dir(response))
+        print("Get device %s:" % id, response.id, response.num_id, response.name, response.gateway_config)
     except Exception as e:
         print(e)
         raise
@@ -212,7 +215,7 @@ def device_create_numid(project, region, registry, id, numid):
     request = iot_v1.CreateDeviceRequest(parent=parent, device=device)
 
     response = client.create_device(request)
-    print(response)
+    # print(response)
     try:
         # print("Created device %s:" % id, response.id, response.num_id, response.name)
         print("Created device %s:" % id)
@@ -234,7 +237,7 @@ def device_unbind_from_gateway(project, region, registry, id, gateway):
         gatewayId=gateway
     )
     response = client.unbind_device_from_gateway(request)
-    print(response)
+    print("Unbound device %s from gateway %s:" % (id, gateway), response)
 
 def device_update_numid(project, region, registry, id, numid):
     client = iot_v1.DeviceManagerClient()
@@ -352,6 +355,7 @@ def main():
     parser.add_argument("-r","--region", default="us-central1", help="GCP PubSub region")
     parser.add_argument("-g", "--registry",  default="", help="registry name")
     parser.add_argument("-d", "--device", default="", help="device name")
+    parser.add_argument("-y", "--gateway", default="", help="gateway name (useful to unbind a proxied device before deletion)")
     parser.add_argument("-n", "--device-num-id", default="", help="device num ID")
     parser.add_argument("-o", "--operation", default="", help="operation: can be list, create, delete, get, device-list")
     parser.add_argument("-e", "--event-topic", default="", help="event topic")
@@ -366,6 +370,7 @@ def main():
     REGION_ID = args.region
     TARGET_REGISTRY_ID = args.registry
     TARGET_DEVICE_ID = args.device
+    TARGET_GATEWAY_ID = args.gateway
     TARGET_DEVICE_NUMID = args.device_num_id
     TARGET_DEVICE_KEY = args.public_key
     TARGET_DEVICE_KEY_FORMAT = args.public_key_format
@@ -415,7 +420,11 @@ def main():
                 if TARGET_DEVICE_KEY != "" and TARGET_DEVICE_KEY_FORMAT != "":
                     device_update_key(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID, TARGET_DEVICE_KEY, TARGET_DEVICE_KEY_FORMAT)
             case "delete":
-                device_delete(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID)
+                if TARGET_GATEWAY_ID != "":
+                    device_unbind_from_gateway(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID, TARGET_GATEWAY_ID)
+                    device_delete(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID)
+                else:
+                    device_delete(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID)
             case "get":
                 device_get(PROJECT_ID, REGION_ID, TARGET_REGISTRY_ID, TARGET_DEVICE_ID)
                 print("Last config message:")
